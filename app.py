@@ -4,40 +4,26 @@ import cv2
 import numpy as np
 from PIL import Image
 
-# --- STABLE CACHING FOR LANGUAGES ---
-# This function only reruns if you change the language list, saving memory.
+# --- STABLE CACHING FOR THE AI MODEL ---
+# This ensures the model only loads once and stays in memory.
 @st.cache_resource
-def get_reader(langs):
-    return easyocr.Reader(langs, gpu=False)
+def get_reader():
+    # Only loading English ('en') to maximize stability.
+    return easyocr.Reader(['en'], gpu=False)
 
 def main():
     st.set_page_config(page_title="Pro AI OCR Scanner", layout="wide")
     st.title("📄 Pro AI Document OCR Scanner")
 
-    # --- SIDEBAR: RESTORED FEATURES ---
-    st.sidebar.header("1. Settings")
-    
-    # Restored: Multiple Language Support
-    lang_options = {
-        "English": "en", "German": "de", "French": "fr", 
-        "Spanish": "es", "Italian": "it", "Dutch": "nl"
-    }
-    selected_langs = st.sidebar.multiselect(
-        "Select Languages", 
-        options=list(lang_options.keys()), 
-        default=["English"]
-    )
-    lang_codes = [lang_options[l] for l in selected_langs]
-    
-    # Restored: Image Enhancement (Grayscale/Binarization)
-    st.sidebar.header("2. Image Processing")
+    # Sidebar: Core Features
+    st.sidebar.header("1. Image Processing")
     enhance = st.sidebar.toggle("Enhance Image (Grayscale + Otsu)", value=True)
     
-    # File Uploader
-    uploaded_file = st.sidebar.file_uploader("Upload Document", type=['jpg', 'jpeg', 'png'])
+    st.sidebar.header("2. Upload Document")
+    uploaded_file = st.sidebar.file_uploader("Upload Image", type=['jpg', 'jpeg', 'png'])
 
-    # Initialize the reader with chosen languages
-    reader = get_reader(lang_codes)
+    # Initialize the stable English reader
+    reader = get_reader()
 
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
@@ -47,13 +33,15 @@ def main():
         
         with col1:
             st.subheader("Visual Preview")
-            # Apply restored Grayscale/Otsu logic
             display_img = img_array.copy()
+            
+            # Apply Image Enhancement logic
             if enhance:
-                # If image is RGBA (4 channels), convert to RGB first
+                # Handle images with Alpha channels (RGBA to RGB)
                 if len(display_img.shape) == 3 and display_img.shape[2] == 4:
                     display_img = cv2.cvtColor(display_img, cv2.COLOR_RGBA2RGB)
                 
+                # Convert to Grayscale and apply Otsu's Thresholding
                 gray = cv2.cvtColor(display_img, cv2.COLOR_RGB2GRAY)
                 display_img = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
             
@@ -62,12 +50,12 @@ def main():
         with col2:
             st.subheader("Extracted Results")
             if st.button("🚀 Start AI Scan"):
-                with st.spinner("AI is analyzing document..."):
-                    # Use the enhanced image for better OCR accuracy
+                with st.spinner("AI is reading English text..."):
+                    # Use the processed image for better OCR results
                     results = reader.readtext(display_img if enhance else img_array, detail=0)
                     st.session_state['full_text'] = "\n".join(results)
             
-            # Restored: Keyword Search & Results
+            # Keyword Search & Download Results
             if 'full_text' in st.session_state:
                 search_term = st.text_input("🔍 Search inside results:", placeholder="Type a word...")
                 
